@@ -152,7 +152,7 @@ if __name__ == "__main__":
             print("ERROR reading initial value -> retry")
             continue
         kwh = get_kwh(payload)
-        if kwh is not None and kwh > 10000:
+        if kwh is not None and kwh > 1:
             send_mqtt(kwh, now)
         else:
             print("ERROR reading kwh value -> resetting buffer")
