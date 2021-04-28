@@ -1,5 +1,7 @@
 # lk13bd-mqtt
-MQTT client for a LK13BD three-phase meter
+MQTT client for a LK13BD three-phase meter. This is my first release. I'm using a OptoHead (https://shop.weidmann-elektronik.de/index.php?page=product&info=24) from Weidmann Elektronik. Running on my raspberry pi.
+
+The script will read the current total power state and calculate the average consumption between two steps. It will publish the current Watt and the total kWh as a MQTT message for further visualisation and storage.
 
 ## configure
 
@@ -38,3 +40,5 @@ sensor:
     json_attributes_topic: "lk13bd/energy"
     json_attributes_template: "{{ value_json.Current | tojson }}"
 ```
+## Todo
+- [ ] Cleanup code
