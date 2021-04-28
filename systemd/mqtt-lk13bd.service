@@ -1,0 +1,14 @@
+[Unit]
+Description=MQTT LK13BD three-phase meter
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/<path to your script>/read_lk13bd.py > /<path to your script>/read_lk13bd.log 2>&1
+User=<user>
+Restart=always
+WorkingDirectory=/<path to your script>/
+
+[Install]
+WantedBy=multi-user.target
+
