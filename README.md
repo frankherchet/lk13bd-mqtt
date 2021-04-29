@@ -12,7 +12,27 @@ Configure the following settings
 
 ## use systemd to start your script automatically
 
-* Add and modify mqtt-lk13bd.service to */lib/systemd/system/*
+* Add mqtt-lk13bd.service to */lib/systemd/system/*
+```
+sudo vi /lib/systemd/system/mqtt-lk13bd.service
+```
+Add the following:
+```
+[Unit]
+Description=MQTT LK13BD three-phase meter
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/<path to your script>/read_lk13bd.py > /<path to your script>/read_lk13bd.log 2>&1
+User=<user>
+Restart=always
+WorkingDirectory=/<path to your script>/
+
+[Install]
+WantedBy=multi-user.target
+```
+Prepare systemd and new service.
 ```
 sudo chmod 644 /lib/systemd/system/mqtt-lk13bd.service
 sudo systemctl daemon-reload
@@ -40,5 +60,7 @@ sensor:
     json_attributes_topic: "lk13bd/energy"
     json_attributes_template: "{{ value_json.Current | tojson }}"
 ```
+That's it. You should now receive your data from LK13BD
+
 ## Todo
 - [ ] Cleanup code
