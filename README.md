@@ -44,21 +44,21 @@ sudo service mqtt-lk13bd start
 
 Add the following lines to */config/configuration.yaml*
 ```
-sensor:
-  - platform: mqtt
-    state_topic: "lk13bd/energy"
-    name: "Total"
-    unit_of_measurement: "kWh"
-    value_template: "{{ value_json.Total }}"
-    json_attributes_topic: "lk13bd/energy"
-    json_attributes_template: "{{ value_json.Total | tojson }}"
-  - platform: mqtt
-    state_topic: "lk13bd/energy"
-    name: "Current"
-    unit_of_measurement: "W"
-    value_template: "{{ value_json.Current }}"
-    json_attributes_topic: "lk13bd/energy"
-    json_attributes_template: "{{ value_json.Current | tojson }}"
+mqtt:
+  sensor:
+    - name: "lk13bd.total_energy"
+      state_topic: "lk13bd/energy"
+      unit_of_measurement: "kWh"
+      value_template: "{{ value_json.Total }}"
+      json_attributes_topic: "lk13bd/energy"
+      json_attributes_template: "{{ value_json.Total | tojson }}"
+
+    - name: "lk13bd.current_energy"
+      state_topic: "lk13bd/energy"
+      unit_of_measurement: "W"
+      value_template: "{{ value_json.Current }}"
+      json_attributes_topic: "lk13bd/energy"
+      json_attributes_template: "{{ value_json.Current | tojson }}"
 ```
 That's it. You should now receive your data from LK13BD
 
