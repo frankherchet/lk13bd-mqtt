@@ -62,5 +62,10 @@ mqtt:
 ```
 That's it. You should now receive your data from LK13BD
 
+## monitor service
+```
+journalctl -u mqtt-lk13bd.service -f
+```
+
 ## Todo
 - [ ] Cleanup code
