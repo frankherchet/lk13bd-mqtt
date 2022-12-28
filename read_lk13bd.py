@@ -1,15 +1,16 @@
 #!/usr/bin/python3
 
-import json
-import re
-import sys
-import time
-from datetime import datetime
-
-import paho.mqtt.client as mqtt
 import serial
+import logging
+import time
+import sys
+import paho.mqtt.client as mqtt
+import re
+from datetime import datetime
+import json
 
-SERIALPORT = "/dev/ttyUSB0"
+EXIT = False
+SERIALPORT = ""
 BAUDRATE = 300
 BYTESIZE = serial.SEVENBITS
 PARITY = serial.PARITY_EVEN
@@ -17,34 +18,60 @@ STOPBITS = serial.STOPBITS_ONE
 RTSCTS = False
 XONXOFF = False
 DSRDTR = False
+LOG_FILE = ""
 read_timeout = 1
 write_timeout = 1
 
-client = None
-mqtt_client_name = "LK13BD"
+mqtt_client_name = ""
 mqtt_host = ""
+mqtt_port = 1883
 mqtt_user = ""
 mqtt_password = ""
-mqtt_client = None
-mqtt_topic_state = "lk13bd/state"
-mqtt_topic_energy = "lk13bd/energy"
+mqtt_topic_state = ""
+mqtt_topic_energy = ""
 mqtt_sleep = 60
 
 mqtt_last_update = None
 mqtt_last_kwh = 0.0
 
+logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(format='%(asctime)s %(message)s')
+
+try:
+    with open('read_lk13bd.json', 'r') as f:
+        cf = json.load(f)
+        SERIALPORT = cf['SERIALPORT']
+        LOG_FILE = cf['LOG_FILE']
+        mqtt_client_name = cf['mqtt_client_name']
+        mqtt_host = cf['mqtt_host']
+        mqtt_port = cf['mqtt_port']
+        mqtt_user = cf['mqtt_user']
+        mqtt_password = cf['mqtt_password']
+        mqtt_topic_state = cf['mqtt_topic_state']
+        mqtt_topic_energy = cf['mqtt_topic_energy']
+        mqtt_sleep = cf['mqtt_sleep']
+        logging.debug(str(cf))
+except Exception as e:
+    logging.error(str(e))
+    sys.exit(-1)
+
+
 try:
     ser = serial.Serial(SERIALPORT, BAUDRATE, timeout=read_timeout, bytesize=BYTESIZE, parity=PARITY, stopbits=STOPBITS,
                         rtscts=RTSCTS,
                         xonxoff=XONXOFF, dsrdtr=DSRDTR, write_timeout=write_timeout)
-    print(ser)
+    logging.debug("serial: " + str(ser))
     ser.reset_input_buffer()
     ser.reset_output_buffer()
 except Exception as e:
-    print(e)
+    logging.error("%s", e)
     sys.exit(-1)
-    close_tty()
 
+
+def signal_handler(sig, frame):
+    logging.info('You pressed Ctrl+C!')
+    global EXIT
+    EXIT = True
 
 def mqtt_connect():
     global mqtt_client
@@ -52,10 +79,18 @@ def mqtt_connect():
         mqtt_client = mqtt.Client(mqtt_client_name, clean_session=True, userdata=None, protocol=mqtt.MQTTv311,
                                   transport="tcp")
         mqtt_client.username_pw_set(mqtt_user, mqtt_password)
-        mqtt_client.connect(mqtt_host, port=1883, keepalive=(mqtt_sleep * 2))
-        print("# MQTT connected: ", mqtt_client)
+        mqtt_client.connect(mqtt_host, port=mqtt_port, keepalive=(mqtt_sleep * 2))
+        logging.info("# MQTT connected: %s", mqtt_host)
     except Exception as e:
-        print(e)
+        logging.error("%s", e)
+        sys.exit(-1)
+
+def mqtt_reconnect():
+    global mqtt_client
+    try:
+        mqtt_client.reconnect()
+    except Exception as e:
+        logging.error("%s", e)
         sys.exit(-1)
 
 
@@ -67,27 +102,26 @@ def read_lines():
             time.sleep(0.1)
             line = ser.readline().decode('ascii')
             if len(line) != 0:
-                print(">", line)
+                logging.debug(">%s",line)
                 lines.append(line)
             else:
                 break
 
         except:
-            pass
-    # print(lines)
+            pass    
     return lines
 
 
 def send_line(cmd=""):
     global ser
-    # print("send", cmd.encode('ascii'))
+    logging.debug("send %s", cmd.encode('ascii') )
     ser.write(str(cmd).encode())
     time.sleep(1)
 
 
 def close_tty():
     global ser
-    print("closed:", ser.closed)
+    logging.info("closed: %s", ser.closed)
     if not ser.closed:
         ser.close()
 
@@ -99,9 +133,9 @@ def get_kwh(lines):
         g = m.search(line)
         if g:
             kwh = float(g.group(2))
-            print("#", kwh, "kwh")
+            logging.info("# %f kWh", kwh)
             return kwh
-    print("ERROR can't find kwh in", lines)
+    logging.error("cant find kwh in %s", line)
     return None
 
 
@@ -112,21 +146,22 @@ def get_average_watt(now, kwh, last_update, last_kwh):
     td = now - last_update
     ws = (d / td.total_seconds())
     w = ws * 3600
-    print("#", kwh, "kwh", w, "W", td.total_seconds(), "s")
+    logging.info("# %f kWh %i W %d s",kwh,int(w),td.total_seconds())
     return int(w)
 
 
-def send_mqtt(kwh, now):
+def send_mqtt(kwh, now, payload=None):
     global mqtt_last_update
     global mqtt_last_kwh
 
     timestamp = now.strftime("%Y-%m-%dT%H:%M:%S")
-    print("#", timestamp)
+    logging.info("# %s", timestamp)
 
     state = {}
     energy = {}
     state['Time'] = timestamp
     state['Sleep'] = mqtt_sleep
+    state['payload'] = str(payload)
     energy['Time'] = timestamp
     energy['Total'] = kwh
     energy['Current'] = get_average_watt(now, kwh, mqtt_last_update, mqtt_last_kwh)
@@ -134,14 +169,14 @@ def send_mqtt(kwh, now):
     mqtt_last_kwh = kwh
 
     mqtt_client.publish(mqtt_topic_state, payload=json.dumps(state))
-    mqtt_client.publish(mqtt_topic_state, payload=json.dumps(energy))
+    mqtt_client.publish(mqtt_topic_energy, payload=json.dumps(energy))
 
 
 if __name__ == "__main__":
     mqtt_connect()
 
-    while True:
-        print("# Reading...")
+    while EXIT == False:
+        logging.info("# Reading...")
         send_line("\x2F\x3F\x21\x0D\x0A")
         read_lines()
         now = datetime.now()
@@ -149,22 +184,24 @@ if __name__ == "__main__":
         payload = read_lines()
         ser.flush()
         if len(payload) < 3:
-            print("ERROR reading initial value -> retry")
+            logging.warning("reading initial value -> retry")
             continue
         kwh = get_kwh(payload)
-        if kwh is not None and kwh > 1:
-            send_mqtt(kwh, now)
+        if kwh is not None and kwh > 10000:
+            mqtt_reconnect()            
+            send_mqtt(kwh, now, payload=payload)
         else:
-            print("ERROR reading kwh value -> resetting buffer")
+            logging.warning("reading kwh value -> resetting buffer")
             ser.reset_output_buffer()
             ser.reset_input_buffer()
             ser.flushInput()
             ser.flushOutput()
             time.sleep(10)
             continue
+        logging.debug("Sleeping %d", mqtt_sleep)
         time.sleep(mqtt_sleep)
-        print('')
 
     close_tty()
 
+logging.info("Exit")
 sys.exit(0)

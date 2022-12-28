@@ -1,0 +1,12 @@
+{
+    "SERIALPORT": "/dev/ttyUSB0",
+    "LOG_FILE": "read_lk13bd.log",
+    "mqtt_client_name": "Drehstromzähler",
+    "mqtt_host": "",
+    "mqtt_port": 1883,
+    "mqtt_user": "",
+    "mqtt_password": "",
+    "mqtt_topic_state": "lk13bd/state",
+    "mqtt_topic_energy": "lk13bd/energy",
+    "mqtt_sleep": 60
+}
